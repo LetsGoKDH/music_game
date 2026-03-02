@@ -18,6 +18,9 @@ let gameRunning = false;
 let player = null;
 let playerReady = false;
 let clipEndTimer = null;
+let timerPaused = false;
+let waitingForSongStart = false;
+let songStartPoller = null;
 
 function $(id) {
   return document.getElementById(id);
@@ -151,6 +154,72 @@ function setHostSongInfo(title, artist) {
   $("song-artist").textContent = artist;
 }
 
+function clearSongStartPoller() {
+  if (songStartPoller) {
+    clearInterval(songStartPoller);
+    songStartPoller = null;
+  }
+}
+
+function clearSongStartWait(resumeTimer = true) {
+  waitingForSongStart = false;
+  clearSongStartPoller();
+  if (resumeTimer) {
+    timerPaused = false;
+  }
+  if (playerReady && player && typeof player.unMute === "function") {
+    try {
+      player.unMute();
+    } catch {
+      // ignore
+    }
+  }
+}
+
+function scheduleClipReplay(song) {
+  clearClipTimer();
+  const clipDuration = Math.max(1, song.endTime - song.startTime) * 1000 + 300;
+  clipEndTimer = setTimeout(replayClip, clipDuration);
+}
+
+function beginSongStartWait(song) {
+  waitingForSongStart = true;
+  timerPaused = true;
+  setNowPlaying(false, "광고/로딩 중... 타이머 일시정지");
+
+  if (playerReady && player && typeof player.mute === "function") {
+    try {
+      player.mute();
+    } catch {
+      // ignore
+    }
+  }
+
+  clearSongStartPoller();
+  songStartPoller = setInterval(() => {
+    if (!gameRunning || !waitingForSongStart || currentSongIndex === null || !playerReady || !player) {
+      clearSongStartPoller();
+      return;
+    }
+
+    let currentTime = 0;
+    let playerState = -1;
+    try {
+      currentTime = player.getCurrentTime();
+      playerState = player.getPlayerState();
+    } catch {
+      return;
+    }
+
+    const startThreshold = Math.max(0, song.startTime - 0.6);
+    if (window.YT && playerState === YT.PlayerState.PLAYING && currentTime >= startThreshold) {
+      clearSongStartWait(true);
+      setNowPlaying(true, "음악 재생 중...");
+      scheduleClipReplay(song);
+    }
+  }, 250);
+}
+
 function loadYouTubeAPI() {
   if (window.YT && window.YT.Player) {
     createPlayer();
@@ -219,6 +288,10 @@ function onPlayerStateChange(event) {
     return;
   }
 
+  if (waitingForSongStart && event.data === YT.PlayerState.PAUSED) {
+    timerPaused = true;
+  }
+
   if (event.data === YT.PlayerState.ENDED) {
     replayClip();
   }
@@ -232,6 +305,7 @@ function handlePlayerError(code) {
   }
 
   if (code === 153) {
+    clearSongStartWait(true);
     setNowPlaying(false, "재생 환경 오류(153) - localhost 또는 GitHub Pages로 접속해 주세요");
     return;
   }
@@ -248,6 +322,7 @@ function handlePlayerError(code) {
     return;
   }
 
+  clearSongStartWait(true);
   setNowPlaying(false, `재생 오류(${code}) - 플레이어 재생 버튼 또는 Replay를 눌러주세요`);
 }
 
@@ -264,15 +339,13 @@ function playSong(song) {
   }
 
   clearClipTimer();
+  beginSongStartWait(song);
 
   player.loadVideoById({
     videoId: song.videoId,
     startSeconds: song.startTime,
     endSeconds: song.endTime,
   });
-
-  const clipDuration = Math.max(1, song.endTime - song.startTime) * 1000 + 300;
-  clipEndTimer = setTimeout(replayClip, clipDuration);
 }
 
 function replayClip() {
@@ -282,15 +355,22 @@ function replayClip() {
 
   const song = SONGS_DB[currentSongIndex];
   clearClipTimer();
+  clearSongStartWait(true);
 
   player.seekTo(song.startTime, true);
+  if (typeof player.unMute === "function") {
+    try {
+      player.unMute();
+    } catch {
+      // ignore
+    }
+  }
   player.playVideo();
-
-  const clipDuration = Math.max(1, song.endTime - song.startTime) * 1000 + 300;
-  clipEndTimer = setTimeout(replayClip, clipDuration);
+  scheduleClipReplay(song);
 }
 
 function stopPlayback() {
+  clearSongStartWait(true);
   clearClipTimer();
 
   if (playerReady && player) {
@@ -317,7 +397,7 @@ function playNextSong() {
   $("game-song-count").textContent = String(songsPlayedCount);
   setHostSongInfo(SONGS_DB[songIdx].title, SONGS_DB[songIdx].artist);
 
-  setNowPlaying(true, "음악 재생 중...");
+  setNowPlaying(false, "곡 준비 중...");
   playSong(SONGS_DB[songIdx]);
 }
 
@@ -423,6 +503,10 @@ function startTimer() {
   }
 
   timerInterval = setInterval(() => {
+    if (timerPaused) {
+      return;
+    }
+
     timeLeft = Math.max(0, timeLeft - 1);
     updateTimer();
 
@@ -496,6 +580,9 @@ function startGame() {
   currentSongIndex = null;
   currentTeamIdx = 0;
   gameRunning = true;
+  timerPaused = false;
+  waitingForSongStart = false;
+  clearSongStartPoller();
 
   showPage("game-page");
   hideAnswer();
