@@ -21,6 +21,9 @@ let clipEndTimer = null;
 let timerPaused = false;
 let waitingForSongStart = false;
 let songStartPoller = null;
+let tournamentStarted = false;
+let waitingNextTeamStart = false;
+let setupLocked = false;
 
 function $(id) {
   return document.getElementById(id);
@@ -66,6 +69,10 @@ function resetStorage() {
 function setupTeamCountButtons() {
   document.querySelectorAll(".team-count-btn").forEach((btn) => {
     btn.addEventListener("click", () => {
+      if (setupLocked) {
+        return;
+      }
+
       document.querySelectorAll(".team-count-btn").forEach((target) => {
         target.classList.remove("active");
       });
@@ -87,6 +94,7 @@ function renderTeamInputs() {
     input.className = "team-name-input";
     input.placeholder = `팀 ${i + 1}`;
     input.value = teams[i] || "";
+    input.disabled = setupLocked;
     container.appendChild(input);
   }
 }
@@ -132,9 +140,18 @@ function updateTurnDisplay() {
   renderScoreboard();
 }
 
-function advanceTurn() {
-  currentTeamIdx = (currentTeamIdx + 1) % teams.length;
-  updateTurnDisplay();
+function setSetupLocked(locked) {
+  setupLocked = locked;
+
+  document.querySelectorAll(".team-count-btn").forEach((btn) => {
+    btn.disabled = locked;
+  });
+
+  document.querySelectorAll(".team-name-input").forEach((input) => {
+    input.disabled = locked;
+  });
+
+  $("btn-reset").disabled = locked;
 }
 
 function hideAnswer() {
@@ -152,6 +169,30 @@ function setNowPlaying(isPlaying, text) {
 function setHostSongInfo(title, artist) {
   $("song-title").textContent = title;
   $("song-artist").textContent = artist;
+}
+
+function updateStartButtonLabel() {
+  const btn = $("btn-start");
+  if (!btn) {
+    return;
+  }
+
+  if (!playerReady) {
+    btn.textContent = "YouTube 로딩 중...";
+    return;
+  }
+
+  if (!tournamentStarted) {
+    btn.textContent = "게임 시작";
+    return;
+  }
+
+  if (waitingNextTeamStart) {
+    btn.textContent = `${getCurrentTeam()} 라운드 시작`;
+    return;
+  }
+
+  btn.textContent = "게임 진행 중";
 }
 
 function clearSongStartPoller() {
@@ -273,7 +314,7 @@ function createPlayer() {
       onReady: (event) => {
         playerReady = true;
         event.target.setVolume(100);
-        $("btn-start").textContent = "게임 시작";
+        updateStartButtonLabel();
       },
       onStateChange: onPlayerStateChange,
       onError: (event) => {
@@ -452,7 +493,6 @@ function onNext() {
     if (!gameRunning) {
       return;
     }
-    advanceTurn();
     playNextSong();
   }, 1500);
 }
@@ -472,7 +512,7 @@ function onPass() {
     if (!gameRunning) {
       return;
     }
-    // Pass only skips the song. Team changes only when score is recorded.
+    // Pass only skips the song within the same team's timed round.
     playNextSong();
   }, 1500);
 }
@@ -511,7 +551,7 @@ function startTimer() {
     updateTimer();
 
     if (timeLeft <= 0) {
-      endGame();
+      finishCurrentTeamRound();
     }
   }, 1000);
 }
@@ -537,6 +577,68 @@ function showPage(pageId) {
     page.classList.remove("active");
   });
   $(pageId).classList.add("active");
+}
+
+function startTeamRound() {
+  if (remainingSongs.length === 0) {
+    alert("남은 곡이 없어 게임을 종료합니다.");
+    endGame();
+    return;
+  }
+
+  gameRunning = true;
+  waitingNextTeamStart = false;
+  passesLeft = PASS_LIMIT;
+  timeLeft = ROUND_SECONDS;
+  currentSongIndex = null;
+  timerPaused = false;
+  waitingForSongStart = false;
+  clearSongStartPoller();
+
+  showPage("game-page");
+  hideAnswer();
+  setHostSongInfo("-", "-");
+  updateTurnDisplay();
+  renderScoreboard();
+  updatePassButton();
+  updateTimer();
+  setNowPlaying(false, "곡 준비 중...");
+  updateStartButtonLabel();
+  startTimer();
+  playNextSong();
+}
+
+function finishCurrentTeamRound() {
+  if (!gameRunning) {
+    return;
+  }
+
+  if (currentTeamIdx >= teams.length - 1) {
+    endGame();
+    return;
+  }
+
+  const finishedTeam = getCurrentTeam();
+  gameRunning = false;
+
+  if (timerInterval) {
+    clearInterval(timerInterval);
+    timerInterval = null;
+  }
+
+  stopPlayback();
+  hideAnswer();
+
+  currentTeamIdx += 1;
+  waitingNextTeamStart = true;
+  updateTurnDisplay();
+  renderScoreboard();
+  setNowPlaying(false, "대기 중");
+  setHostSongInfo("-", "-");
+  showPage("start-page");
+  updateStartButtonLabel();
+
+  alert(`${finishedTeam} 라운드 종료. 다음은 ${getCurrentTeam()} 차례입니다.`);
 }
 
 function startGame() {
@@ -568,31 +670,26 @@ function startGame() {
     return;
   }
 
-  readTeamNames();
-  scores = {};
-  teams.forEach((team) => {
-    scores[team] = 0;
-  });
+  if (!tournamentStarted) {
+    readTeamNames();
+    scores = {};
+    teams.forEach((team) => {
+      scores[team] = 0;
+    });
 
-  passesLeft = PASS_LIMIT;
-  songsPlayedCount = 0;
-  timeLeft = ROUND_SECONDS;
-  currentSongIndex = null;
-  currentTeamIdx = 0;
-  gameRunning = true;
-  timerPaused = false;
-  waitingForSongStart = false;
-  clearSongStartPoller();
+    songsPlayedCount = 0;
+    currentSongIndex = null;
+    currentTeamIdx = 0;
+    tournamentStarted = true;
+    waitingNextTeamStart = true;
+    setSetupLocked(true);
+  }
 
-  showPage("game-page");
-  hideAnswer();
-  setHostSongInfo("-", "-");
-  updateTurnDisplay();
-  renderScoreboard();
-  updatePassButton();
-  updateTimer();
-  startTimer();
-  playNextSong();
+  if (!waitingNextTeamStart) {
+    return;
+  }
+
+  startTeamRound();
 }
 
 function endGame() {
@@ -632,6 +729,9 @@ function endGame() {
   });
 
   showPage("result-page");
+  tournamentStarted = false;
+  waitingNextTeamStart = false;
+  updateStartButtonLabel();
 }
 
 function goHome() {
@@ -644,20 +744,35 @@ function goHome() {
 
   stopPlayback();
   currentSongIndex = null;
+  tournamentStarted = false;
+  waitingNextTeamStart = false;
+  songsPlayedCount = 0;
+  currentTeamIdx = 0;
+  passesLeft = PASS_LIMIT;
+  timeLeft = ROUND_SECONDS;
+  setSetupLocked(false);
 
   playedSongs = loadPlayedFromStorage();
   rebuildRemainingSongs();
   updateSongCounts();
   renderTeamInputs();
+  updatePassButton();
+  updateTimer();
   showPage("start-page");
   setNowPlaying(false, "대기 중");
   setHostSongInfo("-", "-");
+  updateStartButtonLabel();
 }
 
 function bindEvents() {
   $("btn-start").addEventListener("click", startGame);
 
   $("btn-reset").addEventListener("click", () => {
+    if (tournamentStarted) {
+      alert("진행 중인 게임이 끝난 뒤에 곡 목록을 리셋해 주세요.");
+      return;
+    }
+
     const ok = confirm("모든 곡의 재생 기록을 초기화할까요?");
     if (ok) {
       resetStorage();
@@ -685,8 +800,10 @@ function init() {
   renderTeamInputs();
   updateSongCounts();
   updatePassButton();
+  updateTimer();
   setNowPlaying(false, "대기 중");
   setHostSongInfo("-", "-");
+  updateStartButtonLabel();
 
   bindEvents();
   loadYouTubeAPI();
