@@ -392,7 +392,7 @@ function onPass() {
     if (!gameRunning) {
       return;
     }
-    advanceTurn();
+    // Pass only skips the song. Team changes only when score is recorded.
     playNextSong();
   }, 1500);
 }
