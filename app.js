@@ -231,6 +231,11 @@ function handlePlayerError(code) {
     return;
   }
 
+  if (code === 153) {
+    setNowPlaying(false, "재생 환경 오류(153) - localhost 또는 GitHub Pages로 접속해 주세요");
+    return;
+  }
+
   if (code === 100 || code === 101 || code === 150) {
     setNowPlaying(false, `임베드 제한 영상(${code}) - 다음 곡으로 이동`);
     stopPlayback();
@@ -451,6 +456,16 @@ function showPage(pageId) {
 }
 
 function startGame() {
+  if (window.location.protocol === "file:") {
+    alert(
+      "현재 파일 경로(file://)로 열려 있어 YouTube 임베드가 차단됩니다.\n\n" +
+      "아래 방식으로 접속해 주세요.\n" +
+      "1) serve.bat 실행 후 http://localhost:8000\n" +
+      "2) GitHub Pages 주소(https://...github.io/...)"
+    );
+    return;
+  }
+
   if (remainingSongs.length === 0) {
     alert("남은 곡이 없습니다. 곡 목록을 리셋해 주세요.");
     return;
