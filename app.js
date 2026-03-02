@@ -225,20 +225,25 @@ function onPlayerStateChange(event) {
 }
 
 function handlePlayerError(code) {
-  console.error("YouTube player error:", code);
+  const song = currentSongIndex !== null ? SONGS_DB[currentSongIndex] : null;
+  console.error("YouTube player error:", code, song);
   if (!gameRunning) {
     return;
   }
 
-  // Some videos are not embeddable on mobile/web; move to next song automatically.
-  setNowPlaying(false, "재생 불가 영상 감지, 다음 곡으로 이동");
-  stopPlayback();
-  setTimeout(() => {
-    if (!gameRunning) {
-      return;
-    }
-    playNextSong();
-  }, 300);
+  if (code === 100 || code === 101 || code === 150) {
+    setNowPlaying(false, `임베드 제한 영상(${code}) - 다음 곡으로 이동`);
+    stopPlayback();
+    setTimeout(() => {
+      if (!gameRunning) {
+        return;
+      }
+      playNextSong();
+    }, 400);
+    return;
+  }
+
+  setNowPlaying(false, `재생 오류(${code}) - 플레이어 재생 버튼 또는 Replay를 눌러주세요`);
 }
 
 function clearClipTimer() {
