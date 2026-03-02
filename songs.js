@@ -206,5 +206,5 @@ const SONGS_DB = [
 ];
 
 if (SONGS_DB.length !== 200) {
-  console.warn(SONGS_DB length is . Expected 200.);
+  console.warn(`SONGS_DB length is ${SONGS_DB.length}. Expected 200.`);
 }
