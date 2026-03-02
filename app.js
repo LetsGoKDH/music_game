@@ -1,6 +1,9 @@
 ﻿const STORAGE_KEY = "musicquiz_played_indices";
 const ROUND_SECONDS = 180;
 const PASS_LIMIT = 3;
+const CLIP_LENGTH_SCALE = 0.5;
+const MIN_CLIP_SECONDS = 5;
+const CLIP_START_SHIFT_SECONDS = 8;
 
 let teamCount = 4;
 let teams = [];
@@ -18,6 +21,7 @@ let gameRunning = false;
 let player = null;
 let playerReady = false;
 let clipEndTimer = null;
+let currentClipBounds = null;
 let timerPaused = false;
 let waitingForSongStart = false;
 let songStartPoller = null;
@@ -171,6 +175,18 @@ function setHostSongInfo(title, artist) {
   $("song-artist").textContent = artist;
 }
 
+function getClipBounds(song) {
+  const baseDuration = Math.max(1, song.endTime - song.startTime);
+  const duration = Math.max(MIN_CLIP_SECONDS, Math.round(baseDuration * CLIP_LENGTH_SCALE));
+  const startTime = Math.max(0, song.startTime + CLIP_START_SHIFT_SECONDS);
+
+  return {
+    startTime,
+    endTime: startTime + duration,
+    duration,
+  };
+}
+
 function updateStartButtonLabel() {
   const btn = $("btn-start");
   if (!btn) {
@@ -217,13 +233,13 @@ function clearSongStartWait(resumeTimer = true) {
   }
 }
 
-function scheduleClipReplay(song) {
+function scheduleClipReplay(durationSeconds) {
   clearClipTimer();
-  const clipDuration = Math.max(1, song.endTime - song.startTime) * 1000 + 300;
+  const clipDuration = Math.max(1, durationSeconds) * 1000 + 300;
   clipEndTimer = setTimeout(replayClip, clipDuration);
 }
 
-function beginSongStartWait(song) {
+function beginSongStartWait(clipBounds) {
   waitingForSongStart = true;
   timerPaused = true;
   setNowPlaying(false, "광고/로딩 중... 타이머 일시정지");
@@ -252,11 +268,11 @@ function beginSongStartWait(song) {
       return;
     }
 
-    const startThreshold = Math.max(0, song.startTime - 0.6);
+    const startThreshold = Math.max(0, clipBounds.startTime - 0.6);
     if (window.YT && playerState === YT.PlayerState.PLAYING && currentTime >= startThreshold) {
       clearSongStartWait(true);
       setNowPlaying(true, "음악 재생 중...");
-      scheduleClipReplay(song);
+      scheduleClipReplay(clipBounds.duration);
     }
   }, 250);
 }
@@ -379,13 +395,14 @@ function playSong(song) {
     return;
   }
 
+  currentClipBounds = getClipBounds(song);
   clearClipTimer();
-  beginSongStartWait(song);
+  beginSongStartWait(currentClipBounds);
 
   player.loadVideoById({
     videoId: song.videoId,
-    startSeconds: song.startTime,
-    endSeconds: song.endTime,
+    startSeconds: currentClipBounds.startTime,
+    endSeconds: currentClipBounds.endTime,
   });
 }
 
@@ -395,10 +412,12 @@ function replayClip() {
   }
 
   const song = SONGS_DB[currentSongIndex];
+  const clipBounds = currentClipBounds || getClipBounds(song);
+  currentClipBounds = clipBounds;
   clearClipTimer();
   clearSongStartWait(true);
 
-  player.seekTo(song.startTime, true);
+  player.seekTo(clipBounds.startTime, true);
   if (typeof player.unMute === "function") {
     try {
       player.unMute();
@@ -407,10 +426,11 @@ function replayClip() {
     }
   }
   player.playVideo();
-  scheduleClipReplay(song);
+  scheduleClipReplay(clipBounds.duration);
 }
 
 function stopPlayback() {
+  currentClipBounds = null;
   clearSongStartWait(true);
   clearClipTimer();
 
@@ -591,6 +611,7 @@ function startTeamRound() {
   passesLeft = PASS_LIMIT;
   timeLeft = ROUND_SECONDS;
   currentSongIndex = null;
+  currentClipBounds = null;
   timerPaused = false;
   waitingForSongStart = false;
   clearSongStartPoller();
@@ -679,6 +700,7 @@ function startGame() {
 
     songsPlayedCount = 0;
     currentSongIndex = null;
+    currentClipBounds = null;
     currentTeamIdx = 0;
     tournamentStarted = true;
     waitingNextTeamStart = true;
@@ -744,6 +766,7 @@ function goHome() {
 
   stopPlayback();
   currentSongIndex = null;
+  currentClipBounds = null;
   tournamentStarted = false;
   waitingNextTeamStart = false;
   songsPlayedCount = 0;
