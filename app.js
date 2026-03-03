@@ -233,10 +233,31 @@ function clearSongStartWait(resumeTimer = true) {
   }
 }
 
-function scheduleClipReplay(durationSeconds) {
+function stopAtClipEnd() {
+  if (!gameRunning || currentSongIndex === null || !currentClipBounds) {
+    return;
+  }
+
+  clearClipTimer();
+  clearSongStartWait(true);
+  // Clip-end stop should never pause the round timer.
+  timerPaused = false;
+
+  if (playerReady && player) {
+    try {
+      player.pauseVideo();
+    } catch {
+      // ignore
+    }
+  }
+
+  setNowPlaying(false, "구간 종료 - Replay 버튼으로 다시 재생");
+}
+
+function scheduleClipStop(durationSeconds) {
   clearClipTimer();
   const clipDuration = Math.max(1, durationSeconds) * 1000 + 300;
-  clipEndTimer = setTimeout(replayClip, clipDuration);
+  clipEndTimer = setTimeout(stopAtClipEnd, clipDuration);
 }
 
 function beginSongStartWait(clipBounds) {
@@ -272,7 +293,7 @@ function beginSongStartWait(clipBounds) {
     if (window.YT && playerState === YT.PlayerState.PLAYING && currentTime >= startThreshold) {
       clearSongStartWait(true);
       setNowPlaying(true, "음악 재생 중...");
-      scheduleClipReplay(clipBounds.duration);
+      scheduleClipStop(clipBounds.duration);
     }
   }, 250);
 }
@@ -349,8 +370,8 @@ function onPlayerStateChange(event) {
     timerPaused = true;
   }
 
-  if (event.data === YT.PlayerState.ENDED) {
-    replayClip();
+  if (event.data === YT.PlayerState.ENDED && clipEndTimer) {
+    stopAtClipEnd();
   }
 }
 
@@ -426,7 +447,7 @@ function replayClip() {
     }
   }
   player.playVideo();
-  scheduleClipReplay(clipBounds.duration);
+  scheduleClipStop(clipBounds.duration);
 }
 
 function stopPlayback() {
@@ -563,7 +584,7 @@ function startTimer() {
   }
 
   timerInterval = setInterval(() => {
-    if (timerPaused) {
+    if (timerPaused && waitingForSongStart) {
       return;
     }
 
