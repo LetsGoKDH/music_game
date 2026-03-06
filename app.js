@@ -1,6 +1,6 @@
 ﻿const STORAGE_KEY = "musicquiz_played_indices";
 const ROUND_SECONDS = 180;
-const PASS_LIMIT = 3;
+const PASS_LIMIT = 5;
 const CLIP_LENGTH_SCALE = 0.5;
 const MIN_CLIP_SECONDS = 5;
 const CLIP_START_SHIFT_SECONDS = 8;
