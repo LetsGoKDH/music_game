@@ -59,37 +59,15 @@ body {
 
 .team-setup h2 {
   font-size: 1.2rem;
-  margin-bottom: 15px;
+  margin-bottom: 6px;
   text-align: center;
 }
 
-.team-count-selector {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  margin-bottom: 15px;
-}
-
-.team-count-selector label {
-  font-size: 0.95rem;
-  color: #ccc;
-}
-
-.team-count-btn {
-  background: rgba(255, 255, 255, 0.1);
-  border: 2px solid rgba(255, 255, 255, 0.2);
-  color: #fff;
-  padding: 8px 20px;
-  border-radius: 8px;
-  cursor: pointer;
-  font-size: 0.95rem;
-  transition: all 0.2s;
-}
-
-.team-count-btn.active {
-  background: #6c5ce7;
-  border-color: #6c5ce7;
+.team-setup-note {
+  text-align: center;
+  font-size: 0.92rem;
+  color: #bfbfd8;
+  margin-bottom: 16px;
 }
 
 .team-names {
@@ -98,23 +76,69 @@ body {
   gap: 10px;
 }
 
+.team-input-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 12px;
+  transition: border-color 0.2s, background 0.2s;
+}
+
+.team-input-row:last-child:nth-child(odd) {
+  grid-column: 1 / -1;
+}
+
+.team-input-row.current {
+  border-color: rgba(168, 85, 247, 0.9);
+  background: rgba(168, 85, 247, 0.16);
+}
+
+.team-slot-label {
+  flex: 0 0 auto;
+  font-size: 0.88rem;
+  color: #cfc6ff;
+  font-weight: 600;
+}
+
 .team-name-input {
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+  flex: 1 1 auto;
+  min-width: 0;
+  background: transparent;
+  border: none;
   color: #fff;
-  padding: 10px 14px;
-  border-radius: 8px;
+  padding: 4px 0;
   font-size: 0.95rem;
   outline: none;
-  transition: border-color 0.2s;
+  transition: opacity 0.2s;
 }
 
 .team-name-input:focus {
-  border-color: #6c5ce7;
+  opacity: 0.85;
+}
+
+.team-name-input:disabled {
+  cursor: default;
+  opacity: 1;
 }
 
 .team-name-input::placeholder {
   color: rgba(255, 255, 255, 0.4);
+}
+
+.team-score-chip {
+  flex: 0 0 auto;
+  min-width: 52px;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(108, 92, 231, 0.28);
+  color: #efe7ff;
+  font-size: 0.9rem;
+  font-weight: 700;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Song info */
@@ -317,55 +341,40 @@ body {
   color: #aaa;
 }
 
+.turn-team-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
 .turn-team {
   font-size: 1.5rem;
   font-weight: 700;
   color: #a855f7;
 }
 
-/* Answer reveal */
-.answer-reveal {
-  text-align: center;
-  background: rgba(108, 92, 231, 0.2);
-  border: 2px solid #6c5ce7;
-  border-radius: 16px;
-  padding: 20px;
-  margin: 20px 0;
-  animation: fadeIn 0.3s ease;
-}
-
-.answer-reveal.hidden {
-  display: none;
-}
-
-.answer-title {
-  font-size: 1.4rem;
+.turn-score {
+  padding: 6px 12px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.12);
+  color: #fff;
+  font-size: 0.95rem;
   font-weight: 700;
-  margin-bottom: 5px;
-}
-
-.answer-artist {
-  font-size: 1.1rem;
-  color: #a29bfe;
+  font-variant-numeric: tabular-nums;
 }
 
 /* Game controls */
 .game-controls {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr 1fr;
+  grid-template-columns: 1fr 1fr 1fr;
   gap: 10px;
   margin-bottom: 20px;
 }
 
 .btn-replay {
   background: linear-gradient(135deg, #a29bfe, #6c5ce7);
-  color: #fff;
-  font-size: 0.95rem;
-  padding: 12px 8px;
-}
-
-.btn-reveal {
-  background: rgba(255, 255, 255, 0.15);
   color: #fff;
   font-size: 0.95rem;
   padding: 12px 8px;
@@ -409,26 +418,33 @@ body {
 
 .scoreboard-teams {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 10px;
 }
 
 .score-card {
   background: rgba(255, 255, 255, 0.08);
   border-radius: 10px;
-  padding: 12px;
-  text-align: center;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
 }
 
 .score-card .team-name {
-  font-size: 0.85rem;
-  color: #aaa;
-  margin-bottom: 4px;
+  font-size: 0.95rem;
+  color: #f1f1f1;
+  font-weight: 600;
+  overflow-wrap: anywhere;
 }
 
 .score-card .team-score {
-  font-size: 1.8rem;
+  flex: 0 0 auto;
+  font-size: 1.05rem;
   font-weight: 700;
+  color: #c8b6ff;
+  font-variant-numeric: tabular-nums;
 }
 
 .score-card.active-team {
@@ -523,4 +539,9 @@ body {
   }
   .game-controls { grid-template-columns: 1fr 1fr; }
   .team-names { grid-template-columns: 1fr; }
+  .scoreboard-teams { grid-template-columns: 1fr; }
+  .current-turn {
+    flex-direction: column;
+    gap: 6px;
+  }
 }

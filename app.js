@@ -4,8 +4,8 @@ const PASS_LIMIT = 3;
 const CLIP_LENGTH_SCALE = 0.5;
 const MIN_CLIP_SECONDS = 5;
 const CLIP_START_SHIFT_SECONDS = 8;
+const TEAM_COUNT = 5;
 
-let teamCount = 4;
 let teams = [];
 let scores = {};
 let passesLeft = PASS_LIMIT;
@@ -70,43 +70,53 @@ function resetStorage() {
   updateSongCounts();
 }
 
-function setupTeamCountButtons() {
-  document.querySelectorAll(".team-count-btn").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      if (setupLocked) {
-        return;
-      }
+function getDefaultTeamName(index) {
+  return `팀 ${index + 1}`;
+}
 
-      document.querySelectorAll(".team-count-btn").forEach((target) => {
-        target.classList.remove("active");
-      });
+function getSetupScore(teamName) {
+  if (!teamName) {
+    return 0;
+  }
 
-      btn.classList.add("active");
-      teamCount = Number.parseInt(btn.dataset.count, 10);
-      renderTeamInputs();
-    });
-  });
+  return scores[teamName] || 0;
 }
 
 function renderTeamInputs() {
   const container = $("team-names");
   container.innerHTML = "";
 
-  for (let i = 0; i < teamCount; i += 1) {
+  for (let i = 0; i < TEAM_COUNT; i += 1) {
+    const teamName = teams[i] || "";
+    const row = document.createElement("div");
+    row.className = `team-input-row${tournamentStarted && i === currentTeamIdx ? " current" : ""}`;
+
+    const label = document.createElement("span");
+    label.className = "team-slot-label";
+    label.textContent = getDefaultTeamName(i);
+
     const input = document.createElement("input");
     input.type = "text";
     input.className = "team-name-input";
-    input.placeholder = `팀 ${i + 1}`;
-    input.value = teams[i] || "";
+    input.placeholder = getDefaultTeamName(i);
+    input.value = teamName;
     input.disabled = setupLocked;
-    container.appendChild(input);
+
+    const score = document.createElement("span");
+    score.className = "team-score-chip";
+    score.textContent = `${getSetupScore(teamName)}점`;
+
+    row.appendChild(label);
+    row.appendChild(input);
+    row.appendChild(score);
+    container.appendChild(row);
   }
 }
 
 function readTeamNames() {
   const rawNames = [];
   document.querySelectorAll(".team-name-input").forEach((input, i) => {
-    rawNames.push(input.value.trim() || `팀 ${i + 1}`);
+    rawNames.push(input.value.trim() || getDefaultTeamName(i));
   });
 
   const seen = new Map();
@@ -140,26 +150,20 @@ function getCurrentTeam() {
 }
 
 function updateTurnDisplay() {
-  $("turn-team-name").textContent = getCurrentTeam();
+  const currentTeam = getCurrentTeam();
+  $("turn-team-name").textContent = currentTeam;
+  $("turn-team-score").textContent = `${scores[currentTeam] || 0}점`;
   renderScoreboard();
 }
 
 function setSetupLocked(locked) {
   setupLocked = locked;
 
-  document.querySelectorAll(".team-count-btn").forEach((btn) => {
-    btn.disabled = locked;
-  });
-
   document.querySelectorAll(".team-name-input").forEach((input) => {
     input.disabled = locked;
   });
 
   $("btn-reset").disabled = locked;
-}
-
-function hideAnswer() {
-  $("answer-reveal").classList.add("hidden");
 }
 
 function setNowPlaying(isPlaying, text) {
@@ -465,8 +469,6 @@ function playNextSong() {
     return;
   }
 
-  hideAnswer();
-
   const songIdx = pickRandomSong();
   if (songIdx === null) {
     alert("모든 곡을 재생했습니다.");
@@ -492,18 +494,6 @@ function onReplay() {
   setNowPlaying(true, "음악 재생 중...");
 }
 
-function onReveal() {
-  if (!gameRunning || currentSongIndex === null) {
-    return;
-  }
-
-  const song = SONGS_DB[currentSongIndex];
-  $("answer-title").textContent = song.title;
-  $("answer-artist").textContent = song.artist;
-  $("answer-reveal").classList.remove("hidden");
-  setNowPlaying(false, "정답 공개");
-}
-
 function flashTeamScoreCard(teamName) {
   const target = Array.from(document.querySelectorAll(".score-card"))
     .find((card) => card.dataset.team === teamName);
@@ -522,12 +512,12 @@ function onNext() {
     return;
   }
 
-  onReveal();
   stopPlayback();
+  setNowPlaying(false, "정답 공개");
 
   const team = getCurrentTeam();
   scores[team] = (scores[team] || 0) + 1;
-  renderScoreboard();
+  updateTurnDisplay();
   flashTeamScoreCard(team);
 
   setTimeout(() => {
@@ -546,8 +536,8 @@ function onPass() {
   passesLeft -= 1;
   updatePassButton();
 
-  onReveal();
   stopPlayback();
+  setNowPlaying(false, "정답 공개");
 
   setTimeout(() => {
     if (!gameRunning) {
@@ -605,10 +595,17 @@ function renderScoreboard() {
     const card = document.createElement("div");
     card.className = `score-card${idx === currentTeamIdx ? " active-team" : ""}`;
     card.dataset.team = team;
-    card.innerHTML = `
-      <div class="team-name">${team}</div>
-      <div class="team-score">${scores[team] || 0}</div>
-    `;
+
+    const name = document.createElement("div");
+    name.className = "team-name";
+    name.textContent = team;
+
+    const score = document.createElement("div");
+    score.className = "team-score";
+    score.textContent = `${scores[team] || 0}점`;
+
+    card.appendChild(name);
+    card.appendChild(score);
     container.appendChild(card);
   });
 }
@@ -638,10 +635,8 @@ function startTeamRound() {
   clearSongStartPoller();
 
   showPage("game-page");
-  hideAnswer();
   setHostSongInfo("-", "-");
   updateTurnDisplay();
-  renderScoreboard();
   updatePassButton();
   updateTimer();
   setNowPlaying(false, "곡 준비 중...");
@@ -669,12 +664,11 @@ function finishCurrentTeamRound() {
   }
 
   stopPlayback();
-  hideAnswer();
 
   currentTeamIdx += 1;
   waitingNextTeamStart = true;
+  renderTeamInputs();
   updateTurnDisplay();
-  renderScoreboard();
   setNowPlaying(false, "대기 중");
   setHostSongInfo("-", "-");
   showPage("start-page");
@@ -726,6 +720,7 @@ function startGame() {
     tournamentStarted = true;
     waitingNextTeamStart = true;
     setSetupLocked(true);
+    renderTeamInputs();
   }
 
   if (!waitingNextTeamStart) {
@@ -750,7 +745,6 @@ function endGame() {
   stopPlayback();
   setNowPlaying(false, "게임 종료");
   setHostSongInfo("게임 종료", "결과를 확인하세요");
-  hideAnswer();
 
   const sortedTeams = teams.slice().sort((a, b) => (scores[b] || 0) - (scores[a] || 0));
   const ranks = ["1위", "2위", "3위", "4위", "5위", "6위"];
@@ -761,13 +755,26 @@ function endGame() {
   sortedTeams.forEach((team, idx) => {
     const card = document.createElement("div");
     card.className = `final-score-card${idx === 0 ? " rank-1" : ""}`;
-    card.innerHTML = `
-      <span class="rank">${ranks[idx] || `${idx + 1}위`}</span>
-      <div class="team-info">
-        <div class="name">${team}</div>
-      </div>
-      <span class="score">${scores[team] || 0}점</span>
-    `;
+
+    const rank = document.createElement("span");
+    rank.className = "rank";
+    rank.textContent = ranks[idx] || `${idx + 1}위`;
+
+    const info = document.createElement("div");
+    info.className = "team-info";
+
+    const name = document.createElement("div");
+    name.className = "name";
+    name.textContent = team;
+
+    const score = document.createElement("span");
+    score.className = "score";
+    score.textContent = `${scores[team] || 0}점`;
+
+    info.appendChild(name);
+    card.appendChild(rank);
+    card.appendChild(info);
+    card.appendChild(score);
     container.appendChild(card);
   });
 
@@ -790,6 +797,7 @@ function goHome() {
   currentClipBounds = null;
   tournamentStarted = false;
   waitingNextTeamStart = false;
+  scores = {};
   songsPlayedCount = 0;
   currentTeamIdx = 0;
   passesLeft = PASS_LIMIT;
@@ -824,7 +832,6 @@ function bindEvents() {
   });
 
   $("btn-replay").addEventListener("click", onReplay);
-  $("btn-reveal").addEventListener("click", onReveal);
   $("btn-next").addEventListener("click", onNext);
   $("btn-pass").addEventListener("click", onPass);
   $("btn-end").addEventListener("click", endGame);
@@ -840,7 +847,6 @@ function init() {
   playedSongs = loadPlayedFromStorage();
   rebuildRemainingSongs();
 
-  setupTeamCountButtons();
   renderTeamInputs();
   updateSongCounts();
   updatePassButton();

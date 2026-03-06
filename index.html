@@ -13,11 +13,7 @@
 
     <div class="team-setup">
       <h2>팀 설정</h2>
-      <div class="team-count-selector">
-        <label>팀 수</label>
-        <button class="team-count-btn" data-count="3" type="button">3팀</button>
-        <button class="team-count-btn active" data-count="4" type="button">4팀</button>
-      </div>
+      <p class="team-setup-note">5팀 고정 · 팀명만 수정</p>
       <div id="team-names" class="team-names"></div>
     </div>
 
@@ -41,7 +37,10 @@
 
     <div class="current-turn" id="current-turn">
       <span class="turn-label">현재 차례</span>
-      <span class="turn-team" id="turn-team-name">팀 1</span>
+      <div class="turn-team-wrap">
+        <span class="turn-team" id="turn-team-name">팀 1</span>
+        <span class="turn-score" id="turn-team-score">0점</span>
+      </div>
     </div>
 
     <div id="player-container">
@@ -65,14 +64,8 @@
       <p id="playing-status">대기 중</p>
     </div>
 
-    <div id="answer-reveal" class="answer-reveal hidden">
-      <p class="answer-title" id="answer-title">-</p>
-      <p class="answer-artist" id="answer-artist">-</p>
-    </div>
-
     <div class="game-controls">
       <button id="btn-replay" class="btn btn-replay" type="button">Replay</button>
-      <button id="btn-reveal" class="btn btn-reveal" type="button">정답 보기</button>
       <button id="btn-next" class="btn btn-next" type="button">정답 처리</button>
       <button id="btn-pass" class="btn btn-pass" type="button">Pass (<span id="pass-count">3</span>)</button>
     </div>
