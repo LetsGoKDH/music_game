@@ -1,9 +1,9 @@
 ﻿const STORAGE_KEY = "musicquiz_played_indices";
 const ROUND_SECONDS = 180;
 const PASS_LIMIT = 5;
-const CLIP_LENGTH_SCALE = 0.5;
-const MIN_CLIP_SECONDS = 5;
-const CLIP_START_SHIFT_SECONDS = 8;
+const CLIP_LENGTH_SCALE = 1;
+const MIN_CLIP_SECONDS = 1;
+const CLIP_START_SHIFT_SECONDS = 0;
 const TEAM_COUNT = 5;
 
 let teams = [];
